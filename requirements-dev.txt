@@ -1,0 +1,2 @@
+-e .[dev]
+-r requirements.txt
