@@ -2,6 +2,7 @@ import bonobo
 import bonobo_sqlalchemy
 import requests
 import boto3
+import sys
 
 from bonobo.config import use, use_context, use_raw_input, use_context_processor
 from bonobo.constants import NOT_MODIFIED
@@ -54,9 +55,6 @@ def parse_dates(context, row):
 
     if not context.output_type:
         context.set_output_fields(keys)
-
-    #raise ValidationError(context, "Test")
-    import sys
 
     for key in keys:
         if "date" in key and mydict[key] != "":
