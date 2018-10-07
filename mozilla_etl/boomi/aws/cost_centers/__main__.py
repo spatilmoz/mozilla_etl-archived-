@@ -52,7 +52,11 @@ def get_graph(**options):
     """
     graph = bonobo.Graph()
     graph.add_chain(
-        extract_accounts, transform, valid_aws_account, _name="main")
+        extract_accounts,
+        transform,
+        bonobo.JsonWriter('aws_accounts_ex.json'),
+        valid_aws_account,
+        _name="main")
 
     graph.add_chain(
         bonobo.JsonWriter('aws_accounts.json'),
@@ -73,6 +77,7 @@ def get_graph(**options):
             engine='db'),
         _input=valid_aws_account,
     )
+
     return graph
 
 
@@ -118,10 +123,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--use-cache', action='store_true', default=False)
     parser.add_argument('--sn-username', type=str, default='mozvending'),
-    parser.add_argument('--sn-password', type=str, required=True),
+    parser.add_argument('--sn-password', type=str, required=False),
 
     parser.add_argument('--vertica-username', type=str, default='tableau')
-    parser.add_argument('--vertica-password', type=str, required=True),
+    parser.add_argument('--vertica-password', type=str, required=False),
 
     parser.add_argument(
         '--vertica',
