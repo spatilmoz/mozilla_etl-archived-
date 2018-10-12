@@ -24,7 +24,7 @@ python-slugify==1.2.6
 pytz==2018.5
 requests==2.19.1
 six==1.11.0
-sqlalchemy-vertica==0.0.1
+sqlalchemy-vertica-python==0.3.4
 stevedore==1.29.0
 unidecode==1.0.22
 urllib3==1.23
