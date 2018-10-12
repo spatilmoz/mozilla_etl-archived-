@@ -386,5 +386,4 @@ if __name__ == '__main__':
 
         bonobo.run(get_graph(**opt), services=svcs)
         if opt['cleanup']:
-            cleanup(svcs['database'], opt['now'], opt['months'],
-                    opt['table'])
+            cleanup(svcs['database'], opt['now'], opt['months'], opt['table'])
