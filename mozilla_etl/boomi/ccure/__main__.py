@@ -1,16 +1,10 @@
 import bonobo
 import bonobo_sqlalchemy
-import requests
 import os
-import fs
-
-from bonobo.config import use
-from bonobo.constants import NOT_MODIFIED
-from requests.auth import HTTPBasicAuth
-
-from sqlalchemy import create_engine
 
 from dateutil import parser as dateparser
+
+import re
 
 
 def timestamp(admitted, blank1, timestamp, blank2, name, card_id, location):
@@ -19,15 +13,12 @@ def timestamp(admitted, blank1, timestamp, blank2, name, card_id, location):
     yield (admitted, blank1, parsed_date, blank2, name, card_id, location)
 
 
-import re
-
-
 def card_id(admitted, blank1, timestamp, blank2, name, card_id, location):
     find = re.search('\(Card: (\d+)\)', admitted)
 
     if find:
         card_id = find.group(1)
-        yield (admitted, blank1, timestamp, blank2, name, card_id, location)
+        return (admitted, blank1, timestamp, blank2, name, card_id, location)
 
 
 def map_fields(admitted, blank1, timestamp, blank2, name, card_id, location):
@@ -47,28 +38,35 @@ def get_graph(**options):
 
     """
     graph = bonobo.Graph()
+
+    split_dbs = bonobo.noop
+
     graph.add_chain(
-        # Admitted 'Mu, Daosheng' (Card: 50066)   at 'TPE 4th FL Fire Stair West' (IN).||9/1/2016 12:00:05 AM||Mu, Daosheng||TPE 4th FL Fire Stair West
         bonobo.CsvReader(
-            'uploads/BadgeID/Daily Journal Export.txt',
+            options['input_file'],
             delimiter='|',
             fields=('Admitted', 'blank1', 'Timestamp', 'blank2', 'Name',
                     'card_id', 'Location'),
-            fs='brickftp'),
+            fs='sftp'),
         timestamp,
         card_id,
         map_fields,
         bonobo.UnpackItems(0),
-        bonobo_sqlalchemy.InsertOrUpdate(
-            table_name='ccure_activity',
-            discriminant=(
-                'activitydate',
-                'badgeid',
-                'username',
-                'location',
-            ),
-            engine='mysql'),
+        split_dbs,
         _name="main")
+
+    for engine in list(set(options['engine'])):
+        graph.add_chain(
+            bonobo_sqlalchemy.InsertOrUpdate(
+                table_name=options['table_name'],
+                discriminant=(
+                    'activitydate',
+                    'badgeid',
+                    'username',
+                    'location',
+                ),
+                engine=engine),
+            _input=split_dbs)
 
     return graph
 
@@ -84,36 +82,35 @@ def get_services(**options):
     :return: dict
     """
 
-    return {
-        'mysql':
-        create_engine('mysql+mysqldb://localhost/aws', echo=False),
-        'brickftp':
-        fs.open_fs("ssh://mozilla.brickftp.com/etl/ccure"),
-        'vertica':
-        create_engine(
-            options['vertica'].format(
-                host=options['vertica_host'],
-                username=options['vertica_username'],
-                password=options['vertica_password']),
-            echo=False)
-    }
+    return {}
 
 
 # The __main__ block actually execute the graph.
 if __name__ == '__main__':
+    if not __package__:
+        from os import sys, path
+        top = path.dirname(path.dirname(path.dirname(path.abspath(__file__))))
+        sys.path.append(top)
+        __package__ = "boomi.ccure"
+
+    from .. import add_default_arguments, add_default_services
+
     parser = bonobo.get_argument_parser()
 
-    parser.add_argument('--vertica-username', type=str, default='tableau')
-    parser.add_argument('--vertica-password', type=str, required=False),
-    parser.add_argument(
-        '--vertica-host', type=str, default='vsql.dataviz.allizom.org')
+    add_default_arguments(parser)
 
     parser.add_argument(
-        '--vertica',
+        '--input-file',
         type=str,
-        required=False,
-        default=
-        "vertica+vertica_python://{username}:{password}@{host}:5433/metrics")
+        default=os.getenv(
+            'BOOMI_INPUT_FILE',
+            'etl/ccure/uploads/BadgeID/Daily Journal Export.txt'))
+    parser.add_argument(
+        '--table-name',
+        type=str,
+        default=os.getenv('BOOMI_TABLE', 'ccure_activity_etl'))
 
     with bonobo.parse_args(parser) as options:
-        bonobo.run(get_graph(**options), services=get_services(**options))
+        services = get_services(**options)
+        add_default_services(services, **options)
+        bonobo.run(get_graph(**options), services=services)
