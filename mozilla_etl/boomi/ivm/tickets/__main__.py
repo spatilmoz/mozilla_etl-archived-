@@ -39,6 +39,7 @@ and b.transaction_date = (select current_date -2);
         invalid_email,
         format_payload,
         create_ticket,
+        bonobo.UnpackItems(0),
         bonobo.PrettyPrinter(),
     )
 
