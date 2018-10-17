@@ -85,7 +85,7 @@ def format_payload(badgeid, user_id, employee_id, email, item_description,
                    drawer_id, quantity):
     yield {
         "u_badgenumber": badgeid,
-        "u_employeeid": 0,
+        "u_employeeid": employee_id,
         "u_ldapaccount": email,
         "u_transactionid": transaction_id,
         "u_datetimevended": str(transaction_date),
