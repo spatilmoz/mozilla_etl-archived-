@@ -54,7 +54,7 @@ import json
 def create_ticket(row, servicenow):
     resp = servicenow.post(SN_TEST_URL, data=json.dumps(row))
 
-    yield resp.json().get('records')
+    yield from resp.json().get('records')
 
 
 def trim_employ_id(badgeid, user_id, employee_id, email, item_description,
