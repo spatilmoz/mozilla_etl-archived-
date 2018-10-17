@@ -6,13 +6,7 @@ from bonobo.config import use, use_context, use_raw_input
 
 from bonobo.constants import NOT_MODIFIED
 
-import urllib.request
-import http.client
-
-http.client.HTTPConnection.debuglevel = 1
-
 SN_TEST_URL = 'https://mozilla.service-now.com/u_mozilla_vending_webservice.do?JSONv2&sysparm_action=insertMultiple'
-
 
 def get_graph(**options):
     """
