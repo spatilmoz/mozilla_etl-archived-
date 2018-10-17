@@ -6,7 +6,7 @@
 
 # CCure
  
- * FTP_to_Redshift
+ * FTP_to_Redshift (done)
  * CCure-IVM / SN Email updates
 
 # Centerstone
@@ -15,7 +15,7 @@
 
 # IVM
  
- * ServiceNow Create Tickets
+ * ServiceNow Create Tickets (done)
  * FTP_to_Redshift
 
 # Workday
