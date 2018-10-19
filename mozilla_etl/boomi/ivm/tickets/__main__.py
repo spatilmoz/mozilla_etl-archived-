@@ -28,7 +28,7 @@ and b.transaction_date = (select current_date -2);
 
     graph.add_chain(
         bonobo_sqlalchemy.Select(STMT, engine='redshift'),
-        trim_employ_id,
+        trim_employee_id,
         invalid_badge_id,
         invalid_email,
         format_payload,
@@ -52,7 +52,7 @@ def create_ticket(row, servicenow):
     yield from resp.json().get('records')
 
 
-def trim_employ_id(badgeid, user_id, employee_id, email, item_description,
+def trim_employee_id(badgeid, user_id, employee_id, email, item_description,
                    item_number, transaction_date, transaction_id, description,
                    drawer_id, quantity):
     yield (badgeid, user_id, employee_id.strip(), email, item_description,
