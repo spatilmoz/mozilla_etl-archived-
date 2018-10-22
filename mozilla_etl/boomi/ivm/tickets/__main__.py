@@ -6,7 +6,10 @@ from bonobo.config import use, use_context, use_raw_input
 
 from bonobo.constants import NOT_MODIFIED
 
+from dateutil.relativedelta import relativedelta
+
 SN_TEST_URL = 'https://mozilla.service-now.com/u_mozilla_vending_webservice.do?JSONv2&sysparm_action=insertMultiple'
+
 
 def get_graph(**options):
     """
@@ -15,6 +18,14 @@ def get_graph(**options):
     :return: bonobo.Graph
 
     """
+
+    now = options['now']
+
+    # Null out time portion, go back 2 days in the past
+    now += relativedelta(days=-2, hour=0, minute=0, second=0, microsecond=0)
+
+    print("# Processing for %s" % now.date())
+
     graph = bonobo.Graph()
 
     STMT = """
@@ -23,11 +34,11 @@ b.item_description AS item_description, b.item_number AS item_number , b.transac
 b.transaction_id AS transaction_id, b.description AS description, '' AS drawer_id, b.quantity AS quantity
 from  ivm b , (select badgeid,email, employee_id from f_employee group by badgeid,email ,employee_id) a
 where  b.user_id = a.badgeid
-and b.transaction_date = (select current_date -2);
+and b.transaction_date = '{now}';
 """
 
     graph.add_chain(
-        bonobo_sqlalchemy.Select(STMT, engine='redshift'),
+        bonobo_sqlalchemy.Select(STMT.format(now=now), engine='redshift'),
         trim_employee_id,
         invalid_badge_id,
         invalid_email,
@@ -53,8 +64,8 @@ def create_ticket(row, servicenow):
 
 
 def trim_employee_id(badgeid, user_id, employee_id, email, item_description,
-                   item_number, transaction_date, transaction_id, description,
-                   drawer_id, quantity):
+                     item_number, transaction_date, transaction_id,
+                     description, drawer_id, quantity):
     yield (badgeid, user_id, employee_id.strip(), email, item_description,
            item_number, transaction_date, transaction_id, description,
            drawer_id, quantity)
@@ -123,7 +134,19 @@ if __name__ == '__main__':
         top = path.dirname(
             path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
         sys.path.append(top)
-        __package__ = "boomi.ivm.tickets"
+
+        me = []
+        me.append(path.split(path.dirname(path.abspath(__file__)))[1])
+        me.insert(
+            0,
+            path.split(path.dirname(path.dirname(path.abspath(__file__))))[1])
+        me.insert(
+            0,
+            path.split(
+                path.dirname(
+                    path.dirname(path.dirname(path.abspath(__file__)))))[1])
+
+        __package__ = '.'.join(me)
 
     from ... import add_default_arguments, add_default_services
 

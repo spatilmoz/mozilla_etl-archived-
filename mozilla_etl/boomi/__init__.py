@@ -6,6 +6,17 @@ import fs
 from sqlalchemy import create_engine
 from fs.sshfs import SSHFS
 
+from dateutil import parser as dateparser
+import datetime
+
+
+def valid_date(s):
+    try:
+        return dateparser.parse(s)
+    except ValueError:
+        msg = "Not a valid date: '{0}'.".format(s)
+        raise argparse.ArgumentTypeError(msg)
+
 
 def add_default_services(services, **options):
     services['mysql'] = create_engine(
@@ -110,3 +121,9 @@ def add_default_arguments(parser):
         type=str,
         required=False,
         default="postgresql://{username}:{password}@{host}:{port}/{name}")
+
+    parser.add_argument(
+        '--now',
+        required=False,
+        default=datetime.datetime.now(),
+        type=valid_date)
