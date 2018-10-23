@@ -7,7 +7,7 @@
 # CCure
  
  * FTP_to_Redshift (done)
- * CCure-IVM / SN Email updates
+ * CCure-IVM / SN Email updates (done)
 
 # Centerstone
  
