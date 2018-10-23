@@ -9,6 +9,9 @@ from fs.sshfs import SSHFS
 from dateutil import parser as dateparser
 import datetime
 
+import requests
+from requests.auth import HTTPBasicAuth
+
 
 def valid_date(s):
     try:
@@ -46,6 +49,18 @@ def add_default_services(services, **options):
         timeout=10,
         keepalive=10,
         compress=True)
+
+    if options['use_cache']:
+        from requests_cache import CachedSession
+        services['servicenow'] = CachedSession('http.cache')
+    else:
+        services['servicenow'] = requests.Session()
+
+    services['servicenow'].headers = {'User-Agent': 'Mozilla/ETL/v1'}
+    services['servicenow'].auth = HTTPBasicAuth(options['sn_username'],
+                                                options['sn_password'])
+    services['servicenow'].headers.update({'Accept-encoding': 'text/json'})
+
     return
 
 
@@ -127,3 +142,8 @@ def add_default_arguments(parser):
         required=False,
         default=datetime.datetime.now(),
         type=valid_date)
+
+    parser.add_argument('--use-cache', action='store_true', default=False)
+    parser.add_argument('--sn-username', type=str, default='mozvending'),
+    parser.add_argument(
+        '--sn-password', type=str, default=os.getenv("SN_PASSWORD")),

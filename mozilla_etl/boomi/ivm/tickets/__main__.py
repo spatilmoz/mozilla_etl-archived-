@@ -45,14 +45,11 @@ and b.transaction_date = '{now}';
         format_payload,
         create_ticket,
         bonobo.UnpackItems(0),
-        bonobo.PrettyPrinter(),
     )
 
     return graph
 
 
-import requests
-from requests.auth import HTTPBasicAuth
 import json
 
 
@@ -110,21 +107,7 @@ def get_services(**options):
 
     :return: dict
     """
-
-    if options['use_cache']:
-        from requests_cache import CachedSession
-        servicenow = CachedSession('http.cache')
-    else:
-        servicenow = requests.Session()
-
-    servicenow.headers = {'User-Agent': 'Mozilla/ETL/v1'}
-    servicenow.auth = HTTPBasicAuth(options['sn_username'],
-                                    options['sn_password'])
-    servicenow.headers.update({'Accept-encoding': 'text/json'})
-
-    return {
-        'servicenow': servicenow,
-    }
+    return {}
 
 
 # The __main__ block actually execute the graph.
@@ -153,9 +136,6 @@ if __name__ == '__main__':
     parser = bonobo.get_argument_parser()
 
     add_default_arguments(parser)
-    parser.add_argument('--use-cache', action='store_true', default=False)
-    parser.add_argument('--sn-username', type=str, default='mozvending'),
-    parser.add_argument('--sn-password', type=str, required=False),
 
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
