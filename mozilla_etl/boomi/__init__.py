@@ -50,6 +50,9 @@ def add_default_services(services, **options):
         keepalive=10,
         compress=True)
 
+    # Bug workaround to sftp-only server
+    services['sftp']._platform = "Linux"
+
     if options['use_cache']:
         from requests_cache import CachedSession
         services['servicenow'] = CachedSession('http.cache')
