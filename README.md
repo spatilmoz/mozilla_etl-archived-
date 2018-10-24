@@ -16,7 +16,7 @@
 # IVM
  
  * ServiceNow Create Tickets (done)
- * FTP_to_Redshift
+ * FTP_to_Redshift (done)
 
 # Workday
 
