@@ -59,6 +59,7 @@ setup(
       'fs-s3fs==0.1.9',
       'fs.sshfs==0.8.0',
       'fs==2.0.27',
+      'lxml==4.1.1',
       'mysqlclient==1.3.13',
       'psycopg2-binary==2.7.5',
       'psycopg2==2.7.5',
