@@ -11,7 +11,7 @@
 
 # Centerstone
  
- * Centersone-Workday / Update Desk ID
+ * Centersone-Workday / Update Desk ID (partial)
 
 # IVM
  
