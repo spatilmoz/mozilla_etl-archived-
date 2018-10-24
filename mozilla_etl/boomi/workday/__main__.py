@@ -125,13 +125,14 @@ def get_services(**options):
 
 
 # The __main__ block actually execute the graph.
+import os
 if __name__ == '__main__':
     parser = bonobo.get_argument_parser()
 
     parser.add_argument('--use-cache', action='store_true', default=False)
     parser.add_argument(
-        '--wd-username', type=str, default='ServiceBus_IntSysUser'),
-    parser.add_argument('--wd-password', type=str, required=True),
+        '--wd-username', type=str, default='ServiceBus_IntSysUser')
+    parser.add_argument('--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
 
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
