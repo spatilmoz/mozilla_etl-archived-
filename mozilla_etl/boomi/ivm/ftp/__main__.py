@@ -19,9 +19,9 @@ import fs
 
 MAX_DESCRIPTION_LENGTH = 8
 
+
 @transformation_factory
 def GetOrderXML(glob=[], prefix="/etl/ivm"):
-
     @use_context
     @use_no_input
     @use('sftp')
@@ -31,19 +31,21 @@ def GetOrderXML(glob=[], prefix="/etl/ivm"):
             if file.is_file:
                 with sftp.open(os.path.join(prefix, file.name)) as fp:
                     file = untangle.parse(fp)
-        
+
                     for transaction in file.NewDataSet.transaction:
                         emit = {}
                         for element in transaction.get_elements():
                             emit[element._name.title()] = element.cdata
-                    
+
                         yield emit
+
     return _GetOrderXML
 
-@transformation_factory        
+
+@transformation_factory
 def ParseDates(fields):
     fields = list(fields)
-    
+
     def _ParseDates(row):
         modified = False
         for key in fields:
@@ -52,20 +54,23 @@ def ParseDates(fields):
                 if date:
                     row[key] = date.date()
                     modified = True
-        
+
         if modified:
             yield row
         else:
             yield NOT_MODIFIED
-        
+
     return _ParseDates
+
 
 def truncate_description(row):
     if len(row['Vendingmachines_Descr']) > MAX_DESCRIPTION_LENGTH:
-        row['Vendingmachines_Descr'] = row['Vendingmachines_Descr'][:MAX_DESCRIPTION_LENGTH]
+        row['Vendingmachines_Descr'] = row[
+            'Vendingmachines_Descr'][:MAX_DESCRIPTION_LENGTH]
         return row
     else:
         return NOT_MODIFIED
+
 
 def get_graph(**options):
     """
@@ -79,7 +84,12 @@ def get_graph(**options):
     split_dbs = bonobo.noop
 
     graph.add_chain(
-        GetOrderXML(prefix="/etl/ivm", glob=['Mozilla_Corporation{timestamp:%Y_%m_%d}*.xml'.format(timestamp=options['now'])]),
+        GetOrderXML(
+            prefix="/etl/ivm",
+            glob=[
+                'Mozilla_Corporation{timestamp:%Y_%m_%d}*.xml'.format(
+                    timestamp=options['now'])
+            ]),
         ParseDates(['Transactionlog_Tranenddatetime']),
         truncate_description,
         bonobo.UnpackItems(0),
@@ -87,8 +97,7 @@ def get_graph(**options):
             transaction_date='Transactionlog_Tranenddatetime',
             item_number='Transactionlog_Itemnumber',
             transaction_id='Transactionlog_Tlid',
-            item_description='Transactionlog_Itemdesc'
-        ),
+            item_description='Transactionlog_Itemdesc'),
         bonobo.Rename(
             user_id='Transactionlog_User',
             quantity='Transactionlog_Qty',
@@ -96,19 +105,15 @@ def get_graph(**options):
             description='Vendingmachines_Descr',
         ),
         split_dbs,
-        
         _name="main")
 
-#insert into ivm (description, transaction_id, item_number, item_description, user_id, quantity, transaction_date, transaction_code) values
-     
+    #insert into ivm (description, transaction_id, item_number, item_description, user_id, quantity, transaction_date, transaction_code) values
 
     for engine in list(set(options['engine'])):
         graph.add_chain(
             bonobo_sqlalchemy.InsertOrUpdate(
                 table_name=options['table_name'],
-                discriminant=(
-                    'transaction_id',
-                ),
+                discriminant=('transaction_id', ),
                 engine=engine),
             _input=split_dbs)
 
@@ -157,9 +162,7 @@ if __name__ == '__main__':
     add_default_arguments(parser)
 
     parser.add_argument(
-        '--table-name',
-        type=str,
-        default=os.getenv('BOOMI_TABLE', 'ivm_etl'))
+        '--table-name', type=str, default=os.getenv('BOOMI_TABLE', 'ivm_etl'))
 
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
