@@ -183,30 +183,23 @@ def get_cs_graph(**options):
         split_employees,
         _name="main")
 
+    # Process regular employees
     graph.add_chain(
         bonobo.Filter(filter=regular_employee),
         #bonobo.PrettyPrinter(),
         _input=split_employees)
 
+    # Process Contingent employees
     graph.add_chain(
         bonobo.Filter(filter=temp_employee),
         #bonobo.PrettyPrinter(),
         _input=split_employees)
 
+    # Dump out outlier employees
     graph.add_chain(
         bonobo.Filter(filter=odd_employee),
-        #bonobo.PrettyPrinter(),
+        bonobo.PrettyPrinter(),
         _input=split_employees)
-
-    #   for engine in list(set(options['engine'])):
-    #        graph.add_chain(
-    #            bonobo_sqlalchemy.InsertOrUpdate(
-    #                table_name=options['table_name'],
-    #                discriminant=(
-    #                    'transaction_id',
-    #                ),
-    #                engine=engine),
-    #            _input=split_dbs)
 
     return graph
 
