@@ -134,7 +134,7 @@ def join_employee_type(row):
 
 def prefix_desk_ids(row):
     desk_id = row['SeatID']
-    if desk_id.isdigit():
+    if desk_id[:1].isdigit():
         if row['WorkLocation_CS'] in OFFICE_IDS:
             row['SeatID'] = "{office_prefix}{seat_id}".format(
                 office_prefix=OFFICE_IDS[row['WorkLocation_CS']],
@@ -142,6 +142,18 @@ def prefix_desk_ids(row):
         return row
     else:
         return NOT_MODIFIED
+
+
+def regular_employee(self, row):
+    return row['wd_employee_type'] == "Employee"
+
+
+def temp_employee(self, row):
+    return row['wd_employee_type'] == "Contingent Worker"
+
+
+def odd_employee(*args):
+    return not (temp_employee(*args) or regular_employee(*args))
 
 
 def get_cs_graph(**options):
@@ -153,7 +165,7 @@ def get_cs_graph(**options):
     """
     graph = bonobo.Graph()
 
-    split_dbs = bonobo.noop
+    split_employees = bonobo.noop
 
     graph.add_chain(
         bonobo.FileReader(
@@ -166,10 +178,25 @@ def get_cs_graph(**options):
         join_desk_ids,
         join_employee_type,
         mismatch,
-        bonobo.UnpackItems(0),
-        bonobo.PrettyPrinter(),
-        #split_dbs,
+        #bonobo.UnpackItems(0),
+        #bonobo.PrettyPrinter(),
+        split_employees,
         _name="main")
+
+    graph.add_chain(
+        bonobo.Filter(filter=regular_employee),
+        #bonobo.PrettyPrinter(),
+        _input=split_employees)
+
+    graph.add_chain(
+        bonobo.Filter(filter=temp_employee),
+        #bonobo.PrettyPrinter(),
+        _input=split_employees)
+
+    graph.add_chain(
+        bonobo.Filter(filter=odd_employee),
+        #bonobo.PrettyPrinter(),
+        _input=split_employees)
 
     #   for engine in list(set(options['engine'])):
     #        graph.add_chain(
@@ -255,5 +282,9 @@ if __name__ == '__main__':
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
         add_default_services(services, **options)
+
+        print("# Running Workday deskid cache")
         bonobo.run(get_wd_graph(**options), services=services)
+
+        print("# Running consolidation")
         bonobo.run(get_cs_graph(**options), services=services)
