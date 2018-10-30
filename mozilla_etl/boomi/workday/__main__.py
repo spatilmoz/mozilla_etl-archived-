@@ -87,7 +87,10 @@ def get_costcenter_graph(**options):
         bonobo.UnpackItems(0),
         # Can't skip the header, but must
         bonobo.CsvWriter(
-            'CostCenterLevel2.txt.new', delimiter="\t", fs="brickftp"),
+            '/etl/centerstone/downloads/CostCenterLevel2.txt.bonobo',
+            lineterminator="\n",
+            delimiter="\t",
+            fs="sftp"),
         bonobo.count,
         _name="main")
 
@@ -117,19 +120,40 @@ def get_services(**options):
     workday.headers.update({'Accept-encoding': 'text/json'})
 
     return {
-        'workday':
-        workday,
-        'brickftp':
-        fs.open_fs("ssh://mozilla.brickftp.com/etl/centerstone/downloads/"),
+        'workday': workday,
+        #   'brickftp':
+        #   fs.open_fs("ssh://mozilla.brickftp.com/etl/centerstone/downloads/"),
     }
 
 
 # The __main__ block actually execute the graph.
 import os
+# The __main__ block actually execute the graph.
 if __name__ == '__main__':
-    parser = bonobo.get_argument_parser()
+    if not __package__:
+        from os import sys, path
+        top = path.dirname(
+            path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
+        sys.path.append(top)
 
-    parser.add_argument('--use-cache', action='store_true', default=False)
+        me = []
+        me.append(path.split(path.dirname(path.abspath(__file__)))[1])
+        me.insert(
+            0,
+            path.split(path.dirname(path.dirname(path.abspath(__file__))))[1])
+        me.insert(
+            0,
+            path.split(
+                path.dirname(
+                    path.dirname(path.dirname(path.abspath(__file__)))))[1])
+
+        __package__ = '.'.join(me)
+
+    from .. import add_default_arguments, add_default_services
+
+    parser = bonobo.get_argument_parser()
+    add_default_arguments(parser)
+
     parser.add_argument(
         '--wd-username', type=str, default='ServiceBus_IntSysUser')
     parser.add_argument(
@@ -137,6 +161,8 @@ if __name__ == '__main__':
 
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
+        add_default_services(services, **options)
+
         costcenter_g = get_costcenter_graph(**options)
         bu_g = get_bu_graph(**options)
 

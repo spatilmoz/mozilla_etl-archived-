@@ -47,3 +47,4 @@ Unidecode==1.0.22
 urllib3==1.23
 vertica-python==0.8.0
 whistle==1.0.1
+zeep==3.1.0

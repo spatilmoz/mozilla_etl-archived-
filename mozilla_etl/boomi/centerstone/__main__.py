@@ -12,12 +12,20 @@ import re
 import io
 import csv
 
+import requests
+from requests.auth import HTTPBasicAuth
+
 from lxml import etree
 
 import untangle
 
 import pprint
 import fs
+import datetime
+
+from zeep import Client
+from zeep.wsse.username import UsernameToken
+import zeep.exceptions
 
 OFFICE_IDS = {
     'San Francisco': 'SF',
@@ -33,8 +41,9 @@ OFFICE_IDS = {
     'Taipei': 'TPE',
 }
 
-WORKDAY_BASE_URL = 'https://services1.myworkday.com/'
-WD_DESK_ID_QUERY = 'ccx/service/customreport2/vhr_mozilla/ISU_RAAS/WPR_Worker_Space_Number?format=csv'
+WORKDAY_BASE_URL = 'https://wd2-impl-services1.workday.com/'
+WORKDAY_API_VERSION = 'v26.0'
+WD_DESK_ID_QUERY = 'ccx/service/customreport2/vhr_mozilla_preview/ISU_RAAS/WPR_Worker_Space_Number?format=csv'
 
 _cache = {
     'desk_ids': {},
@@ -58,7 +67,14 @@ def cache_desk_id(cache, row):
     #if find:
     #    desk_number = find.group(2)
 
-    desk_id_cache[row['Employee_ID']] = row['WPR_Desk_Number']
+    if row['Employee_ID'] not in desk_id_cache:
+        desk_id_cache[row['Employee_ID']] = row['WPR_Desk_Number']
+    else:
+        yield {
+            "error":
+            "Employee %s has more than one record!" % row['Employee_ID']
+        }
+
     return NOT_MODIFIED
 
 
@@ -75,6 +91,8 @@ def cache_employee_type(cache, row):
 def get_wd_desk_ids(workday):
     """Retrieve Business Units from WorkDay"""
     resp = workday.get(WORKDAY_BASE_URL + WD_DESK_ID_QUERY)
+
+    print('%r' % resp)
 
     stream = io.StringIO(resp.content.decode("utf-8-sig"))
 
@@ -99,6 +117,7 @@ def get_wd_graph(**options):
 
     graph.add_chain(
         get_wd_desk_ids,
+        bonobo.PrettyPrinter(),
         cache_desk_id,
         cache_employee_type,
         bonobo.UnpackItems(0),
@@ -123,12 +142,15 @@ def mismatch(row):
 
 def join_desk_ids(row):
     row['wd_desk_id'] = _cache['desk_ids'].get(row['EmployeeID'], None)
+
     yield row
 
 
+# Employees not known to WorkDay default to regular 'Employee'
 def join_employee_type(row):
     row['wd_employee_type'] = _cache['employee_type'].get(
-        row['EmployeeID'], None)
+        row['EmployeeID'], 'Employee')
+
     yield row
 
 
@@ -154,6 +176,83 @@ def temp_employee(self, row):
 
 def odd_employee(*args):
     return not (temp_employee(*args) or regular_employee(*args))
+
+
+#factory = wsdl_client.type_factory('bsvc')
+
+
+@use('workday_soap')
+def update_employee_record(row, workday_soap):
+    factory = workday_soap.type_factory('bsvc')
+
+    employee_type = None
+
+    if row['wd_employee_type'] == "Contingent Worker":
+        employee_type = "Contingent_Worker_ID"
+    else:
+        employee_type = "Employee_ID"
+
+    bus_param = factory.Business_Process_ParametersType(
+        Auto_Complete=True, Run_Now=True)
+
+    custom_id_type_primary = factory.Custom_ID_TypeObjectIDType(
+        "CUSTOM_ID_TYPE-3-24",
+        factory.Custom_ID_TypeReferenceEnumeration("Custom_ID_Type_ID"))
+
+    type_ref_primary = factory.Custom_ID_TypeObjectType(
+        ID=[custom_id_type_primary])
+
+    custom_id_data_primary = factory.Custom_ID_DataType(
+        ID=row['SeatID'],
+        ID_Type_Reference=type_ref_primary,
+        Issued_Date=datetime.datetime.now())
+
+    custom_id_primary = factory.Custom_IDType(
+        Custom_ID_Data=custom_id_data_primary, Delete=False)
+
+    custom_id_type_secondary = factory.Custom_ID_TypeObjectIDType(
+        "CUSTOM_ID_TYPE-3-25",
+        factory.Custom_ID_TypeReferenceEnumeration("Custom_ID_Type_ID"))
+    type_ref_secondary = factory.Custom_ID_TypeObjectType(
+        ID=[custom_id_type_secondary])
+
+    custom_id_data_secondary = factory.Custom_ID_DataType(
+        ID=None,
+        ID_Type_Reference=type_ref_secondary,
+        Issued_Date=datetime.datetime.now())
+
+    custom_id_secondary = factory.Custom_IDType(
+        Custom_ID_Data=custom_id_data_secondary, Delete=False)
+
+    custom = factory.Custom_Identification_DataType([custom_id_primary], True)
+
+    emp_type = factory.WorkerObjectIDType(
+        row['EmployeeID'], factory.WorkerReferenceEnumeration(employee_type))
+
+    worker = factory.WorkerObjectType(emp_type)
+
+    change_id = factory.Change_Other_IDs_Business_Process_DataType(
+        Worker_Reference=worker, Custom_Identification_Data=custom)
+
+    resp = None
+
+    try:
+        resp = workday_soap.service.Change_Other_IDs(
+            version=WORKDAY_API_VERSION,
+            Business_Process_Parameters=bus_param,
+            Change_Other_IDs_Data=change_id,
+        )
+
+    except IndexError as e:
+        print("Known bug with empty SOAP Body in responses '%s', nothing to do"
+              % e)
+    except zeep.exceptions.Fault as e:
+        True
+        #print("Validation error %s" % e)
+        #raise
+
+    if resp:
+        yield resp
 
 
 def get_cs_graph(**options):
@@ -185,27 +284,18 @@ def get_cs_graph(**options):
 
     # Process regular employees
     graph.add_chain(
-        bonobo.Filter(filter=regular_employee),
-        #bonobo.PrettyPrinter(),
-        _input=split_employees)
-
-    # Process Contingent employees
-    graph.add_chain(
-        bonobo.Filter(filter=temp_employee),
-        #bonobo.PrettyPrinter(),
+        bonobo.PrettyPrinter(),
+        update_employee_record,
+        bonobo.PrettyPrinter(),
         _input=split_employees)
 
     # Dump out outlier employees
     graph.add_chain(
         bonobo.Filter(filter=odd_employee),
-        bonobo.PrettyPrinter(),
+        #bonobo.PrettyPrinter(),
         _input=split_employees)
 
     return graph
-
-
-import requests
-from requests.auth import HTTPBasicAuth
 
 
 def get_services(**options):
@@ -228,10 +318,21 @@ def get_services(**options):
     workday.auth = HTTPBasicAuth(options['wd_username'],
                                  options['wd_password'])
     workday.headers.update({'Accept-encoding': 'text/json'})
-    #sftp MozillaBrickFTP@ftp.asset-fm.com:/Out/HrExport.txt .
+
+    wsdl_client = Client(
+        WORKDAY_BASE_URL + 'ccx/service/vhr_mozilla_preview/Human_Resources/' +
+        WORKDAY_API_VERSION + '?wsdl',
+        wsse=UsernameToken(
+            "%s@vhr_mozilla_preview" % (options['wd_username']),
+            options['wd_password'],
+            use_digest=False),
+    )
+
+    wsdl_client.set_ns_prefix('bsvc', 'urn:com.workday/bsvc')
 
     return {
         'workday': workday,
+        'workday_soap': wsdl_client,
         'centerstone':
         fs.open_fs("ssh://MozillaBrickFTP@ftp.asset-fm.com:/Out/"),
         #'centerstone': fs.open_fs('.'),
