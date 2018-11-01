@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
         __package__ = '.'.join(me)
 
-    from .. import add_default_arguments, add_default_services
+    from ... import add_default_arguments, add_default_services
 
     parser = bonobo.get_argument_parser()
     add_default_arguments(parser)
