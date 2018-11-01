@@ -117,11 +117,8 @@ def get_wd_graph(**options):
 
     graph.add_chain(
         get_wd_desk_ids,
-        bonobo.PrettyPrinter(),
         cache_desk_id,
         cache_employee_type,
-        bonobo.UnpackItems(0),
-        #bonobo.PrettyPrinter(),
         _name="main")
 
     return graph
@@ -243,13 +240,16 @@ def update_employee_record(row, workday_soap):
             Change_Other_IDs_Data=change_id,
         )
 
+    # Known bug with empty SOAP Body in responses
     except IndexError as e:
-        print("Known bug with empty SOAP Body in responses '%s', nothing to do"
-              % e)
+        resp = {
+            'Status': 'Nothing to do',
+        }
     except zeep.exceptions.Fault as e:
-        True
-        #print("Validation error %s" % e)
-        #raise
+        resp = {
+            'Status': 'Failed',
+            'Exception': str(e),  
+        }
 
     if resp:
         yield resp
@@ -277,14 +277,11 @@ def get_cs_graph(**options):
         join_desk_ids,
         join_employee_type,
         mismatch,
-        #bonobo.UnpackItems(0),
-        #bonobo.PrettyPrinter(),
         split_employees,
         _name="main")
 
     # Process regular employees
     graph.add_chain(
-        bonobo.PrettyPrinter(),
         update_employee_record,
         bonobo.PrettyPrinter(),
         _input=split_employees)
@@ -292,7 +289,8 @@ def get_cs_graph(**options):
     # Dump out outlier employees
     graph.add_chain(
         bonobo.Filter(filter=odd_employee),
-        #bonobo.PrettyPrinter(),
+        bonobo.UnpackItems(0),
+        bonobo.PrettyPrinter(),
         _input=split_employees)
 
     return graph
