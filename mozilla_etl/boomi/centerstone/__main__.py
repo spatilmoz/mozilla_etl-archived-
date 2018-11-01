@@ -43,11 +43,10 @@ OFFICE_IDS = {
 
 WORKDAY_BASE_URL = 'https://wd2-impl-services1.workday.com/'
 WORKDAY_API_VERSION = 'v26.0'
-WD_DESK_ID_QUERY = 'ccx/service/customreport2/vhr_mozilla_preview/ISU_RAAS/WPR_Worker_Space_Number?format=csv'
+WD_DESK_ID_QUERY = 'ccx/service/customreport2/{tenant}/ISU_RAAS/WPR_Worker_Space_Number?format=csv'
 
 _cache = {
-    'desk_ids': {},
-    'employee_type': {},
+    'wpr': {},
 }
 
 
@@ -59,16 +58,11 @@ import re
 
 
 @use_context_processor(cache)
-def cache_desk_id(cache, row):
-    desk_id_cache = cache['desk_ids']
+def cache_wpr(cache, row):
+    wpr_cache = cache['wpr']
 
-    #desk_number =  row['WPR_Desk_Number']
-    #find = re.search('(\D+)?(\d+)', desk_number)
-    #if find:
-    #    desk_number = find.group(2)
-
-    if row['Employee_ID'] not in desk_id_cache:
-        desk_id_cache[row['Employee_ID']] = row['WPR_Desk_Number']
+    if row['Employee_ID'] not in wpr_cache:
+        wpr_cache[row['Employee_ID']] = row
     else:
         yield {
             "error":
@@ -78,19 +72,13 @@ def cache_desk_id(cache, row):
     return NOT_MODIFIED
 
 
-@use_context_processor(cache)
-def cache_employee_type(cache, row):
-    employee_type_cache = cache['employee_type']
-
-    employee_type_cache[row['Employee_ID']] = row['Worker_Type']
-
-    return NOT_MODIFIED
-
-
 @use('workday')
-def get_wd_desk_ids(workday):
+@use('workday_url')
+@use('workday_tenant')
+def get_wd_desk_ids(workday, workday_url, workday_tenant):
     """Retrieve Business Units from WorkDay"""
-    resp = workday.get(WORKDAY_BASE_URL + WD_DESK_ID_QUERY)
+    resp = workday.get(workday_url +
+                       WD_DESK_ID_QUERY.format(tenant=workday_tenant))
 
     print('%r' % resp)
 
@@ -115,11 +103,7 @@ def get_wd_graph(**options):
 
     split_dbs = bonobo.noop
 
-    graph.add_chain(
-        get_wd_desk_ids,
-        cache_desk_id,
-        cache_employee_type,
-        _name="main")
+    graph.add_chain(get_wd_desk_ids, cache_wpr, _name="main")
 
     return graph
 
@@ -133,22 +117,14 @@ def split_tabs(row):
 
 
 def mismatch(row):
-    if row['wd_desk_id'] != row['SeatID']:
+    if row['wpr']['WPR_Desk_Number'] != row['SeatID']:
         return NOT_MODIFIED
 
 
-def join_desk_ids(row):
-    row['wd_desk_id'] = _cache['desk_ids'].get(row['EmployeeID'], None)
-
-    yield row
-
-
-# Employees not known to WorkDay default to regular 'Employee'
-def join_employee_type(row):
-    row['wd_employee_type'] = _cache['employee_type'].get(
-        row['EmployeeID'], 'Employee')
-
-    yield row
+def join_wpr(row):
+    if row['EmployeeID'] in _cache['wpr']:
+        row['wpr'] = _cache['wpr'].get(row['EmployeeID'])
+        yield row
 
 
 def prefix_desk_ids(row):
@@ -164,11 +140,11 @@ def prefix_desk_ids(row):
 
 
 def regular_employee(self, row):
-    return row['wd_employee_type'] == "Employee"
+    return row['wpr']['Worker_Type'] == "Employee"
 
 
 def temp_employee(self, row):
-    return row['wd_employee_type'] == "Contingent Worker"
+    return row['wpr']['Worker_Type'] == "Contingent Worker"
 
 
 def odd_employee(*args):
@@ -184,10 +160,14 @@ def update_employee_record(row, workday_soap):
 
     employee_type = None
 
-    if row['wd_employee_type'] == "Contingent Worker":
+    if row['wpr']['Worker_Type'] == "Contingent Worker":
         employee_type = "Contingent_Worker_ID"
     else:
         employee_type = "Employee_ID"
+
+    print("XXX: Updating seat %s to %s for %s %s" %
+          (row['wpr']['WPR_Desk_Number'], row['SeatID'],
+           row['wpr']['First_Name'], row['wpr']['Last_Name']))
 
     bus_param = factory.Business_Process_ParametersType(
         Auto_Complete=True, Run_Now=True)
@@ -214,7 +194,7 @@ def update_employee_record(row, workday_soap):
         ID=[custom_id_type_secondary])
 
     custom_id_data_secondary = factory.Custom_ID_DataType(
-        ID=None,
+        ID="",
         ID_Type_Reference=type_ref_secondary,
         Issued_Date=datetime.datetime.now())
 
@@ -246,10 +226,7 @@ def update_employee_record(row, workday_soap):
             'Status': 'Nothing to do',
         }
     except zeep.exceptions.Fault as e:
-        resp = {
-            'Status': 'Failed',
-            'Exception': str(e),  
-        }
+        raise e
 
     if resp:
         yield resp
@@ -274,17 +251,18 @@ def get_cs_graph(**options):
             eol="\r\n"),
         split_tabs,
         prefix_desk_ids,
-        join_desk_ids,
-        join_employee_type,
+        join_wpr,
         mismatch,
         split_employees,
         _name="main")
 
     # Process regular employees
-    graph.add_chain(
-        update_employee_record,
-        bonobo.PrettyPrinter(),
-        _input=split_employees)
+    if options['dry_run']:
+        update = ()
+    else:
+        update = (update_employee_record, )
+
+    graph.add_chain(*update, bonobo.PrettyPrinter(), _input=split_employees)
 
     # Dump out outlier employees
     graph.add_chain(
@@ -318,10 +296,11 @@ def get_services(**options):
     workday.headers.update({'Accept-encoding': 'text/json'})
 
     wsdl_client = Client(
-        WORKDAY_BASE_URL + 'ccx/service/vhr_mozilla_preview/Human_Resources/' +
-        WORKDAY_API_VERSION + '?wsdl',
+        options['wd_base_url'] +
+        'ccx/service/{tenant}/Human_Resources/'.format(
+            tenant=options['wd_tenant']) + WORKDAY_API_VERSION + '?wsdl',
         wsse=UsernameToken(
-            "%s@vhr_mozilla_preview" % (options['wd_username']),
+            "%s@%s" % (options['wd_username'], options['wd_tenant']),
             options['wd_password'],
             use_digest=False),
     )
@@ -330,6 +309,8 @@ def get_services(**options):
 
     return {
         'workday': workday,
+        'workday_url': options['wd_base_url'],
+        'workday_tenant': options['wd_tenant'],
         'workday_soap': wsdl_client,
         'centerstone':
         fs.open_fs("ssh://MozillaBrickFTP@ftp.asset-fm.com:/Out/"),
@@ -369,7 +350,16 @@ if __name__ == '__main__':
         '--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
 
     parser.add_argument(
-        '--table-name', type=str, default=os.getenv('BOOMI_TABLE', 'ivm_etl'))
+        '--wd-base-url',
+        type=str,
+        default=os.getenv('WD_BASE_URL', WORKDAY_BASE_URL))
+    parser.add_argument(
+        '--wd-tenant',
+        type=str,
+        default=os.getenv('WD_TENANT', 'vhr_mozilla_preview'))
+
+    parser.add_argument(
+        '--dry-run', action='store_true', default=os.getenv('DRY_RUN', False))
 
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
