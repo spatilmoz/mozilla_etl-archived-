@@ -1,6 +1,7 @@
 import bonobo
 import bonobo_sqlalchemy
 import requests
+import os
 
 from bonobo.config import use
 from bonobo.constants import NOT_MODIFIED
@@ -23,7 +24,7 @@ def transform(account):
 
     yield {
         'account_name': account['u_account_name'],
-        'account_id': int(account['u_account_number'].strip() or 0),
+        'linked_account_number': int(account['u_account_number'].strip() or 0),
         'requester': account['u_requester'],
         'cost_center': account['cost_center'],
     }
@@ -34,7 +35,7 @@ def transform(account):
 # - cost_center
 #
 def valid_aws_account(account):
-    if not account['account_id']:
+    if not account['linked_account_number']:
         return
 
     if not account['cost_center']:
@@ -51,90 +52,65 @@ def get_graph(**options):
 
     """
     graph = bonobo.Graph()
+
+    split_dbs = bonobo.noop
+
     graph.add_chain(
         extract_accounts,
         transform,
-        bonobo.JsonWriter('aws_accounts_ex.json'),
         valid_aws_account,
+        bonobo.UnpackItems(0),
+        split_dbs,
         _name="main")
 
-    graph.add_chain(
-        bonobo.JsonWriter('aws_accounts.json'),
-        _input="main",
-    )
-
-    graph.add_chain(
-        bonobo.UnpackItems(0),
-        bonobo.CsvWriter('aws_accounts.csv'),
-        _input=valid_aws_account,
-    )
-
-    graph.add_chain(
-        bonobo.UnpackItems(0),
-        bonobo_sqlalchemy.InsertOrUpdate(
-            table_name='aws_accounts',
-            discriminant=('account_id', ),
-            engine='db'),
-        _input=valid_aws_account,
-    )
+    for engine in list(set(options['engine'])):
+        graph.add_chain(
+            bonobo_sqlalchemy.InsertOrUpdate(
+                table_name=options['table_name'],
+                discriminant=('account_name', ),
+                engine=engine),
+            _input=split_dbs)
 
     return graph
 
 
 def get_services(**options):
-    """
-    This function builds the services dictionary, which is a simple dict of names-to-implementation used by bonobo
-    for runtime injection.
-
-    It will be used on top of the defaults provided by bonobo (fs, http, ...). You can override those defaults, or just
-    let the framework define them. You can also define your own services and naming is up to you.
-
-    :return: dict
-    """
-
-    if options['use_cache']:
-        from requests_cache import CachedSession
-        servicenow = CachedSession('http.cache')
-    else:
-        servicenow = requests.Session()
-
-    servicenow.headers = {'User-Agent': 'Mozilla/ETL/v1'}
-    servicenow.auth = HTTPBasicAuth(options['sn_username'],
-                                    options['sn_password'])
-    servicenow.headers.update({'Accept-encoding': 'text/json'})
-
-    return {
-        'servicenow':
-        servicenow,
-        'db':
-        create_engine('sqlite:///test.sqlite', echo=False),
-        'vertica':
-        create_engine(
-            options['vertica'].format(
-                username=options['vertica_username'],
-                password=options['vertica_password']),
-            echo=False)
-    }
+    return {}
 
 
 # The __main__ block actually execute the graph.
 if __name__ == '__main__':
+    if not __package__:
+        from os import sys, path
+        top = path.dirname(
+            path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
+        sys.path.append(top)
+
+        me = []
+        me.append(path.split(path.dirname(path.abspath(__file__)))[1])
+        me.insert(
+            0,
+            path.split(path.dirname(path.dirname(path.abspath(__file__))))[1])
+        me.insert(
+            0,
+            path.split(
+                path.dirname(
+                    path.dirname(path.dirname(path.abspath(__file__)))))[1])
+
+        __package__ = '.'.join(me)
+
+    from ... import add_default_arguments, add_default_services
+
     parser = bonobo.get_argument_parser()
 
-    parser.add_argument('--use-cache', action='store_true', default=False)
-    parser.add_argument('--sn-username', type=str, default='mozvending'),
-    parser.add_argument('--sn-password', type=str, required=False),
-
-    parser.add_argument('--vertica-username', type=str, default='tableau')
-    parser.add_argument('--vertica-password', type=str, required=False),
+    add_default_arguments(parser)
 
     parser.add_argument(
-        '--vertica',
+        '--table-name',
         type=str,
-        required=False,
-        default=
-        "vertica+vertica_python://{username}:{password}@vsql.dataviz.allizom.org:5433/metrics"
-    )
+        default=os.getenv('BOOMI_TABLE', 'dim_aws_accounts'))
 
     with bonobo.parse_args(parser) as options:
-        bonobo.run(get_graph(**options), services=get_services(**options))
+        services = get_services(**options)
+        add_default_services(services, **options)
+        bonobo.run(get_graph(**options), services=services)
