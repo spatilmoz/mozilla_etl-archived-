@@ -89,11 +89,24 @@ def get_services(**options):
 if __name__ == '__main__':
     if not __package__:
         from os import sys, path
-        top = path.dirname(path.dirname(path.dirname(path.abspath(__file__))))
+        top = path.dirname(
+            path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
         sys.path.append(top)
-        __package__ = "boomi.ccure"
 
-    from .. import add_default_arguments, add_default_services
+        me = []
+        me.append(path.split(path.dirname(path.abspath(__file__)))[1])
+        me.insert(
+            0,
+            path.split(path.dirname(path.dirname(path.abspath(__file__))))[1])
+        me.insert(
+            0,
+            path.split(
+                path.dirname(
+                    path.dirname(path.dirname(path.abspath(__file__)))))[1])
+
+        __package__ = '.'.join(me)
+
+    from ... import add_default_arguments, add_default_services
 
     parser = bonobo.get_argument_parser()
 

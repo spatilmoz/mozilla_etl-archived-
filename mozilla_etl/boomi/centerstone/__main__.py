@@ -165,8 +165,8 @@ def update_employee_record(row, workday_soap):
     else:
         employee_type = "Employee_ID"
 
-    print("XXX: Updating seat %s to %s for %s %s" %
-          (row['wpr']['WPR_Desk_Number'], row['SeatID'],
+    print("XXX: [%s] Updating seat %s to %s for %s %s" %
+          (row['EmployeeID'], row['wpr']['WPR_Desk_Number'], row['SeatID'],
            row['wpr']['First_Name'], row['wpr']['Last_Name']))
 
     bus_param = factory.Business_Process_ParametersType(
@@ -262,15 +262,19 @@ def get_cs_graph(**options):
     else:
         update = (update_employee_record, )
 
-    graph.add_chain(*update, bonobo.PrettyPrinter(), _input=split_employees)
-
-    # Dump out outlier employees
     graph.add_chain(
-        bonobo.Filter(filter=odd_employee),
-        bonobo.UnpackItems(0),
+        bonobo.PrettyPrinter(),
+        *update,
         bonobo.PrettyPrinter(),
         _input=split_employees)
 
+    # Dump out outlier employees
+    #graph.add_chain(
+    #    bonobo.Filter(filter=odd_employee),
+    #    bonobo.UnpackItems(0),
+    #    bonobo.PrettyPrinter(),
+    #    _input=split_employees)
+    #
     return graph
 
 
