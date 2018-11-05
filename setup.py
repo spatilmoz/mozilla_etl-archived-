@@ -63,7 +63,7 @@ setup(
         'mysqlclient==1.3.13',
         'psycopg2-binary==2.7.5',
         'psycopg2==2.7.5',
-        'requests',
+        'requests==2.20.0',
         'six==1.10.0',
         'sqlalchemy-vertica-python==0.3.4',
         'sqlalchemy-redshift==0.7.1',
