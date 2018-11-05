@@ -67,6 +67,7 @@ setup(
         'six==1.10.0',
         'sqlalchemy-vertica-python==0.3.4',
         'sqlalchemy-redshift==0.7.1',
+        'untangle==1.1.1',
         'vertica-python==0.8.0',
         'zeep==3.1.0',
     ],
