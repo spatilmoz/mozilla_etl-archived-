@@ -67,7 +67,7 @@ def get_graph(**options):
         graph.add_chain(
             bonobo_sqlalchemy.InsertOrUpdate(
                 table_name=options['table_name'],
-                discriminant=('account_name', ),
+                discriminant=('linked_account_number', ),
                 engine=engine),
             _input=split_dbs)
 
