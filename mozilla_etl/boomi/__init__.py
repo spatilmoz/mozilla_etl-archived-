@@ -43,7 +43,8 @@ def add_default_services(services, **options):
             password=options['vertica_password']),
         echo=False)
 
-    services['sftp'] = fs.open_fs( "ssh://%s@%s" % ( options['sftp_username'], options['sftp_host']  ) )
+    services['sftp'] = fs.open_fs(
+        "ssh://%s@%s" % (options['sftp_username'], options['sftp_host']))
 
     # Bug workaround to sftp-only server
     services['sftp']._platform = "Linux"
