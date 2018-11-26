@@ -5,15 +5,18 @@ import io
 import csv
 import fs
 
-from bonobo.config import Configurable, Service, ContextProcessor, use, use_context
+from bonobo.config import Configurable, Service, ContextProcessor, use, use_context, use_context_processor
 from bonobo.config import use
 from bonobo.constants import NOT_MODIFIED
 from requests.auth import HTTPBasicAuth
 
-WORKDAY_BASE_URL = 'https://services1.myworkday.com'
+WORKDAY_BASE_URL = 'https://wd2-impl-services1.workday.com'
 COST_CENTERS_QUERY = '/ccx/service/customreport2/vhr_mozilla/ISU_RAAS/intg__Business_Units_Feed?Organizations%21WID=4f414049b78141f3981464563b36ba46!7f8db47cd30d4cdfa5670e37ee0df3ad&Include_Subordinate_Organizations=1&format=csv&bom=true'
 BU_QUERY = '/ccx/service/customreport2/vhr_mozilla/ISU_RAAS/intg__Supervisory_Orgs_Feed?format=csv&bom=true'
 
+_cache = {}
+def cache(self, context):
+    yield _cache
 
 @use('workday')
 def get_cost_centers(workday):
@@ -48,7 +51,7 @@ def get_business_units(workday):
 import collections
 
 
-def centerstone_remap(row):
+def centerstone_CostCenter_remap(row):
     dict = collections.OrderedDict()
     dict['Product_Line'] = row['Cost_Center_Hierarchy']
     dict['Cost_Center'] = row['Cost_Center']
@@ -60,16 +63,117 @@ def centerstone_remap(row):
     yield dict
 
 
+@use_context_processor(cache)
+def join_cost_centers(cache, row):
+    if row['Cost_Center'] in cache:
+        row['Cost_Center_Details'] = cache[row['Cost_Center']]
+        yield row
+    else:
+       # print("Encountered record without a known cost center %r" % row)
+        raise ValueError(
+           "Encountered record without a known cost center", row)
+
+
+def centerstone_BU_SupOrg_Merge_remap(row):
+    dict = collections.OrderedDict()
+    dict['Team'] = row['Organization']
+    dict['Team_Manager'] = row['manager']
+    dict['Cost_Center'] = row['Cost_Center_Details']['Cost_Center']
+    dict['Cost_Center_ID'] = row['Cost_Center_Details']['Cost_Center_ID']
+    dict['Coster_Center_Manager'] = row['Cost_Center_Details']['Manager']
+    dict['Product_Line'] = row['Cost_Center_Details']['Cost_Center_Hierarchy']
+    dict['Product_Line_Manager'] = row['Cost_Center_Details']['CCH_Manager']
+    dict['HRBP'] = row['Cost_Center_Details']['HRBP']
+
+    yield dict
+
+def centerstone_BussUnit_remap(row):
+    dict = collections.OrderedDict()
+    dict['Cost_Center'] = row['Cost_Center']
+    dict['Cost_Center_Number'] = row['Cost_Center_ID']
+    dict['Cost_Center_Manager'] = row['Coster_Center_Manager']
+    dict['Product_Line'] = row['Product_Line']
+    dict['Product_Line_Manager'] = row['Product_Line_Manager']
+    dict['Team'] = row['Team']
+    dict['Team_Manager'] = row['Team_Manager']
+
+    yield dict
+
+
+def productLineLevel1_remap(row):
+    dict = collections.OrderedDict()
+    dict['Product_Line'] = row['Product_Line']
+    dict['Name'] = row['Product_Line']
+    dict['Manager_Name'] = row['Product_Line_Manager']
+    dict['Type'] = 'Product Line'
+
+    yield dict
+
+_product_line_cache = {}
+def product_line_cache(self, context):
+    yield _product_line_cache
+
+
+@use_context_processor(product_line_cache)
+def unique_product_line(cache, row):
+    product_line = row['Product_Line']
+
+    if product_line not in cache:
+        cache[product_line] = True
+        yield NOT_MODIFIED
+
+
+def teamLevel3_remap(row):
+    dict = collections.OrderedDict()
+    dict['Cost_Center'] = row['Cost_Center']
+    dict['Product_Line'] = row['Product_Line']
+    dict['Team'] = row['Team']
+    dict['Name'] = row['Team']
+    dict['Manager_Name'] = row['Team_Manager']
+    dict['Type'] = 'Team'
+
+    yield dict
+
 def get_bu_graph(**options):
     graph = bonobo.Graph()
     graph.add_chain(
         get_business_units,
-        bonobo.Limit(2),
+        join_cost_centers,
+        centerstone_BU_SupOrg_Merge_remap,
+        centerstone_BussUnit_remap,
+    )
+    
+    graph.add_chain(
+        #bonobo.Limit(3),
+        #bonobo.PrettyPrinter(),
+        productLineLevel1_remap,
+        unique_product_line,
+        bonobo.UnpackItems(0),
         bonobo.PrettyPrinter(),
-        bonobo.count,
+        bonobo.CsvWriter(
+            '/etl/centerstone/downloads/ProductLineLevel1.txt.bonobo',
+            lineterminator="\n",
+            delimiter="\t",
+            fs="sftp"),
+        _input= centerstone_BussUnit_remap
+    )
+    graph.add_chain(
+        teamLevel3_remap,
+        bonobo.UnpackItems(0),
+        bonobo.CsvWriter(
+            '/etl/centerstone/downloads/TeamLevel3.txt.bonobo',
+            lineterminator="\n",
+            delimiter="\t",
+            fs="sftp"),
+        _input= centerstone_BussUnit_remap
     )
 
     return graph
+
+@use_context_processor(cache)
+def cache_cost_centers(cache, row):
+    cache[row['Cost_Center']] = row
+    return NOT_MODIFIED
 
 
 def get_costcenter_graph(**options):
@@ -82,8 +186,9 @@ def get_costcenter_graph(**options):
     graph = bonobo.Graph()
     graph.add_chain(
         get_cost_centers,
-        centerstone_remap,
-        bonobo.PrettyPrinter(),
+        cache_cost_centers,
+        centerstone_CostCenter_remap,
+        #bonobo.PrettyPrinter(),
         bonobo.UnpackItems(0),
         # Can't skip the header, but must
         bonobo.CsvWriter(
@@ -121,8 +226,6 @@ def get_services(**options):
 
     return {
         'workday': workday,
-        #   'brickftp':
-        #   fs.open_fs("ssh://mozilla.brickftp.com/etl/centerstone/downloads/"),
     }
 
 
@@ -155,7 +258,7 @@ if __name__ == '__main__':
     add_default_arguments(parser)
 
     parser.add_argument(
-        '--wd-username', type=str, default='ServiceBus_IntSysUser')
+        '--wd-username', type=str, default='ISU-WPR')
     parser.add_argument(
         '--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
 
