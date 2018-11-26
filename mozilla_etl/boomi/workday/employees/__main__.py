@@ -13,10 +13,11 @@ from requests.auth import HTTPBasicAuth
 WORKDAY_BASE_URL = 'https://wd2-impl-services1.workday.com'
 GET_USERS_QUERY = '/ccx/service/customreport2/vhr_mozilla/ISU_RAAS/intg__Service_Bus?format=csv&bom=true'
 
+
 @use('workday')
 def get_workday_users(workday):
     """Retrieve employees list from WorkDay"""
-    
+
     resp = workday.get(WORKDAY_BASE_URL + GET_USERS_QUERY)
 
     stream = io.StringIO(resp.content.decode("utf-8-sig"))
@@ -27,7 +28,6 @@ def get_workday_users(workday):
 
     for row in data:
         yield dict(zip(headers, row))
-
 
 
 import collections
@@ -47,13 +47,14 @@ def workday_centerstone_employee_remap(row):
     dict['Manager'] = row['Manager']
     dict['Team'] = row['Supervisory_Organization']
     dict['termination_date'] = row['termination_date']
-    
+
     yield dict
+
 
 def split_termed_employee(row):
     if row['Employee_Status'] == 'Terminated':
         yield row
-    
+
 
 def split_active_employee(row):
     if row['Employee_Status'] != 'Terminated':
@@ -69,32 +70,28 @@ def get_workday_employee_graph(**options):
     """
     graph = bonobo.Graph()
     graph.add_chain(
-        get_workday_users,
-        workday_centerstone_employee_remap,
+        get_workday_users, workday_centerstone_employee_remap,
         bonobo.UnpackItems(0),
         bonobo.CsvWriter(
             'workday-users.csv.bonobo',
             lineterminator="\n",
             delimiter="\t",
-            fs="sftp")
-    )
-    
+            fs="sftp"))
+
     graph.add_chain(
         split_active_employee,
         bonobo.UnpackItems(0),
         bonobo.Limit(3),
         bonobo.PrettyPrinter(),
-        _input= workday_centerstone_employee_remap
-    )
- 
+        _input=workday_centerstone_employee_remap)
+
     graph.add_chain(
         split_termed_employee,
         bonobo.UnpackItems(0),
         bonobo.Limit(3),
         bonobo.PrettyPrinter(),
-        _input= workday_centerstone_employee_remap
-    )
-    
+        _input=workday_centerstone_employee_remap)
+
     return graph
 
 
@@ -121,9 +118,9 @@ def get_services(**options):
     workday.headers.update({'Accept-encoding': 'text/json'})
 
     return {
-        'workday':
-        workday,
+        'workday': workday,
     }
+
 
 # The __main__ block actually execute the graph.
 import os
@@ -153,8 +150,7 @@ if __name__ == '__main__':
     parser = bonobo.get_argument_parser()
     add_default_arguments(parser)
 
-    parser.add_argument(
-        '--wd-username', type=str, default='ISU-WPR')
+    parser.add_argument('--wd-username', type=str, default='ISU-WPR')
     parser.add_argument(
         '--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
 
@@ -166,5 +162,4 @@ if __name__ == '__main__':
 
         # Run Workday GET users process
         print("# Running CostCenter process")
-        bonobo.run(users_g, services=services)         
-
+        bonobo.run(users_g, services=services)

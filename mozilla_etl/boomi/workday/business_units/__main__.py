@@ -15,8 +15,11 @@ COST_CENTERS_QUERY = '/ccx/service/customreport2/vhr_mozilla/ISU_RAAS/intg__Busi
 BU_QUERY = '/ccx/service/customreport2/vhr_mozilla/ISU_RAAS/intg__Supervisory_Orgs_Feed?format=csv&bom=true'
 
 _cache = {}
+
+
 def cache(self, context):
     yield _cache
+
 
 @use('workday')
 def get_cost_centers(workday):
@@ -69,9 +72,8 @@ def join_cost_centers(cache, row):
         row['Cost_Center_Details'] = cache[row['Cost_Center']]
         yield row
     else:
-       # print("Encountered record without a known cost center %r" % row)
-        raise ValueError(
-           "Encountered record without a known cost center", row)
+        # print("Encountered record without a known cost center %r" % row)
+        raise ValueError("Encountered record without a known cost center", row)
 
 
 def centerstone_BU_SupOrg_Merge_remap(row):
@@ -86,6 +88,7 @@ def centerstone_BU_SupOrg_Merge_remap(row):
     dict['HRBP'] = row['Cost_Center_Details']['HRBP']
 
     yield dict
+
 
 def centerstone_BussUnit_remap(row):
     dict = collections.OrderedDict()
@@ -109,7 +112,10 @@ def productLineLevel1_remap(row):
 
     yield dict
 
+
 _product_line_cache = {}
+
+
 def product_line_cache(self, context):
     yield _product_line_cache
 
@@ -134,6 +140,7 @@ def teamLevel3_remap(row):
 
     yield dict
 
+
 def get_bu_graph(**options):
     graph = bonobo.Graph()
     graph.add_chain(
@@ -142,7 +149,7 @@ def get_bu_graph(**options):
         centerstone_BU_SupOrg_Merge_remap,
         centerstone_BussUnit_remap,
     )
-    
+
     graph.add_chain(
         #bonobo.Limit(3),
         #bonobo.PrettyPrinter(),
@@ -155,8 +162,7 @@ def get_bu_graph(**options):
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"),
-        _input= centerstone_BussUnit_remap
-    )
+        _input=centerstone_BussUnit_remap)
     graph.add_chain(
         teamLevel3_remap,
         bonobo.UnpackItems(0),
@@ -165,10 +171,10 @@ def get_bu_graph(**options):
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"),
-        _input= centerstone_BussUnit_remap
-    )
+        _input=centerstone_BussUnit_remap)
 
     return graph
+
 
 @use_context_processor(cache)
 def cache_cost_centers(cache, row):
@@ -257,8 +263,7 @@ if __name__ == '__main__':
     parser = bonobo.get_argument_parser()
     add_default_arguments(parser)
 
-    parser.add_argument(
-        '--wd-username', type=str, default='ISU-WPR')
+    parser.add_argument('--wd-username', type=str, default='ISU-WPR')
     parser.add_argument(
         '--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
 
