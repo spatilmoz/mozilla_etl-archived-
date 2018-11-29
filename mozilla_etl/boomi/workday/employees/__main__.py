@@ -10,7 +10,7 @@ from bonobo.config import use
 from bonobo.constants import NOT_MODIFIED
 from requests.auth import HTTPBasicAuth
 
-WORKDAY_BASE_URL = 'https://wd2-impl-services1.workday.com'
+WORKDAY_BASE_URL = 'https://services1.myworkday.com'
 GET_USERS_QUERY = '/ccx/service/customreport2/vhr_mozilla/ISU_RAAS/intg__Service_Bus?format=csv&bom=true'
 
 
@@ -81,15 +81,23 @@ def get_workday_employee_graph(**options):
     graph.add_chain(
         split_active_employee,
         bonobo.UnpackItems(0),
-        bonobo.Limit(3),
         bonobo.PrettyPrinter(),
+        bonobo.CsvWriter(
+            'Mozilla_Active_Users.txt.bonobo',
+            lineterminator="\n",
+            delimiter="\t",
+            fs="sftp"),
         _input=workday_centerstone_employee_remap)
 
     graph.add_chain(
         split_termed_employee,
         bonobo.UnpackItems(0),
-        bonobo.Limit(3),
         bonobo.PrettyPrinter(),
+        bonobo.CsvWriter(
+            'Mozilla_Termed_Users.txt.bonobo',
+            lineterminator="\n",
+            delimiter="\t",
+            fs="sftp"),
         _input=workday_centerstone_employee_remap)
 
     return graph
@@ -161,5 +169,5 @@ if __name__ == '__main__':
         users_g = get_workday_employee_graph(**options)
 
         # Run Workday GET users process
-        print("# Running CostCenter process")
+        print("# Running GET Workday Employee process")
         bonobo.run(users_g, services=services)
