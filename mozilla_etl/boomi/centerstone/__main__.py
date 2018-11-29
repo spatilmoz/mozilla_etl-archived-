@@ -288,16 +288,6 @@ def get_services(**options):
 
     :return: dict
     """
-    if options['use_cache']:
-        from requests_cache import CachedSession
-        workday = CachedSession('http.cache')
-    else:
-        workday = requests.Session()
-
-    workday.headers = {'User-Agent': 'Mozilla/ETL/v1'}
-    workday.auth = HTTPBasicAuth(options['wd_username'],
-                                 options['wd_password'])
-    workday.headers.update({'Accept-encoding': 'text/json'})
 
     wsdl_client = Client(
         options['wd_base_url'] +
@@ -312,13 +302,9 @@ def get_services(**options):
     wsdl_client.set_ns_prefix('bsvc', 'urn:com.workday/bsvc')
 
     return {
-        'workday': workday,
         'workday_url': options['wd_base_url'],
         'workday_tenant': options['wd_tenant'],
         'workday_soap': wsdl_client,
-        'centerstone':
-        fs.open_fs("ssh://MozillaBrickFTP@ftp.asset-fm.com:/Out/"),
-        #'centerstone': fs.open_fs('.'),
     }
 
 
@@ -348,26 +334,15 @@ if __name__ == '__main__':
     parser = bonobo.get_argument_parser()
 
     add_default_arguments(parser)
-    parser.add_argument(
-        '--wd-username', type=str, default='ServiceBus_IntSysUser')
-    parser.add_argument(
-        '--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
 
     parser.add_argument(
         '--wd-base-url',
         type=str,
         default=os.getenv('WD_BASE_URL', WORKDAY_BASE_URL))
-    parser.add_argument(
-        '--wd-tenant',
-        type=str,
-        default=os.getenv('WD_TENANT', 'vhr_mozilla_preview'))
-
-    parser.add_argument(
-        '--dry-run', action='store_true', default=os.getenv('DRY_RUN', False))
 
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
-        add_default_services(services, **options)
+        add_default_services(services, options)
 
         print("# Running Workday deskid cache")
         bonobo.run(get_wd_graph(**options), services=services)

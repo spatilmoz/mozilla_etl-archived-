@@ -139,5 +139,5 @@ if __name__ == '__main__':
 
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
-        add_default_services(services, **options)
+        add_default_services(services, options)
         bonobo.run(get_graph(**options), services=services)

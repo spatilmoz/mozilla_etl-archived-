@@ -21,7 +21,7 @@ def valid_date(s):
         raise argparse.ArgumentTypeError(msg)
 
 
-def add_default_services(services, **options):
+def add_default_services(services, options):
     services['mysql'] = create_engine(
         'mysql+mysqldb://localhost/aws', echo=False)
 
@@ -43,22 +43,40 @@ def add_default_services(services, **options):
             password=options['vertica_password']),
         echo=False)
 
-    services['sftp'] = fs.open_fs(
-        "ssh://%s@%s" % (options['sftp_username'], options['sftp_host']))
-
-    # Bug workaround to sftp-only server
-    services['sftp']._platform = "Linux"
+    if options['local']:
+        services['sftp'] = fs.open_fs("file:///tmp/etl")
+        services['centerstone'] = fs.open_fs("file:///tmp/etl")
+    else:
+        services['sftp'] = fs.open_fs(
+            "ssh://%s@%s" % (options['sftp_username'], options['sftp_host']))
+        # Bug workaround to sftp-only server
+        services['sftp']._platform = "Linux"
+        services['centerstone'] = fs.open_fs(
+            "ssh://MozillaBrickFTP@ftp.asset-fm.com:/Out/"),
 
     if options['use_cache']:
         from requests_cache import CachedSession
         services['servicenow'] = CachedSession('http.cache')
+        services['workday'] = CachedSession('http.cache')
     else:
         services['servicenow'] = requests.Session()
+        services['workday'] = requests.Session()
 
     services['servicenow'].headers = {'User-Agent': 'Mozilla/ETL/v1'}
     services['servicenow'].auth = HTTPBasicAuth(options['sn_username'],
                                                 options['sn_password'])
     services['servicenow'].headers.update({'Accept-encoding': 'text/json'})
+
+    services['workday'].headers = {'User-Agent': 'Mozilla/ETL/v1'}
+    services['workday'].auth = HTTPBasicAuth(options['wd_username'],
+                                             options['wd_password'])
+    services['workday'].headers.update({'Accept-encoding': 'text/json'})
+
+    # Set a file suffix for non-prod jobs
+    if options['environment'] == "prod":
+        options['suffix'] = ""
+    else:
+        options['suffix'] = '.' + options['environment']
 
     return
 
@@ -115,7 +133,16 @@ def add_default_arguments(parser):
         type=str,
         default=os.getenv('SFTP_USERNAME', 'moz-etl'))
 
-    #action='store' with nargs='*'.
+    parser.add_argument(
+        '--wd-username', type=str, default=os.getenv('WD_USERNAME', 'ISU-WPR'))
+
+    parser.add_argument(
+        '--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
+
+    parser.add_argument(
+        '--wd-tenant',
+        type=str,
+        default=os.getenv('WD_TENANT', 'vhr_mozilla_preview'))
 
     parser.add_argument(
         '--engine',
@@ -137,10 +164,19 @@ def add_default_arguments(parser):
         default="postgresql://{username}:{password}@{host}:{port}/{name}")
 
     parser.add_argument(
+        '--environment', type=str, required=False, default="stage")
+
+    parser.add_argument(
         '--now',
         required=False,
         default=datetime.datetime.now(),
         type=valid_date)
+
+    parser.add_argument(
+        '--dry-run', action='store_true', default=os.getenv('DRY_RUN', False))
+
+    parser.add_argument(
+        '--local', action='store_true', default=os.getenv('LOCAL', False))
 
     parser.add_argument('--use-cache', action='store_true', default=False)
     parser.add_argument('--sn-username', type=str, default='mozvending'),

@@ -73,7 +73,7 @@ def get_workday_employee_graph(**options):
         get_workday_users, workday_centerstone_employee_remap,
         bonobo.UnpackItems(0),
         bonobo.CsvWriter(
-            'workday-users.csv.bonobo',
+            'workday-users.csv',
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"))
@@ -106,20 +106,7 @@ def get_services(**options):
     :return: dict
     """
 
-    if options['use_cache']:
-        from requests_cache import CachedSession
-        workday = CachedSession('http.cache')
-    else:
-        workday = requests.Session()
-
-    workday.headers = {'User-Agent': 'Mozilla/ETL/v1'}
-    workday.auth = HTTPBasicAuth(options['wd_username'],
-                                 options['wd_password'])
-    workday.headers.update({'Accept-encoding': 'text/json'})
-
-    return {
-        'workday': workday,
-    }
+    return {}
 
 
 # The __main__ block actually execute the graph.
@@ -150,13 +137,9 @@ if __name__ == '__main__':
     parser = bonobo.get_argument_parser()
     add_default_arguments(parser)
 
-    parser.add_argument('--wd-username', type=str, default='ISU-WPR')
-    parser.add_argument(
-        '--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
-
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
-        add_default_services(services, **options)
+        add_default_services(services, options)
 
         users_g = get_workday_employee_graph(**options)
 
