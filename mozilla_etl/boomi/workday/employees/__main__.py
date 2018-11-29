@@ -73,7 +73,7 @@ def get_workday_employee_graph(**options):
         get_workday_users, workday_centerstone_employee_remap,
         bonobo.UnpackItems(0),
         bonobo.CsvWriter(
-            'workday-users.csv',
+            'workday-users.csv' + options['suffix'],
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"))
@@ -81,9 +81,8 @@ def get_workday_employee_graph(**options):
     graph.add_chain(
         split_active_employee,
         bonobo.UnpackItems(0),
-        bonobo.PrettyPrinter(),
-        bonobo.CsvWriter(
-            'Mozilla_Active_Users.txt.bonobo',
+        HeaderlessCsvWriter(
+            'Mozilla_Active_Users.txt' + options['suffix'],
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"),
@@ -92,9 +91,8 @@ def get_workday_employee_graph(**options):
     graph.add_chain(
         split_termed_employee,
         bonobo.UnpackItems(0),
-        bonobo.PrettyPrinter(),
-        bonobo.CsvWriter(
-            'Mozilla_Termed_Users.txt.bonobo',
+        HeaderlessCsvWriter(
+            'Mozilla_Termed_Users.txt' + options['suffix'],
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"),
@@ -140,7 +138,7 @@ if __name__ == '__main__':
 
         __package__ = '.'.join(me)
 
-    from ... import add_default_arguments, add_default_services
+    from ... import add_default_arguments, add_default_services, HeaderlessCsvWriter
 
     parser = bonobo.get_argument_parser()
     add_default_arguments(parser)

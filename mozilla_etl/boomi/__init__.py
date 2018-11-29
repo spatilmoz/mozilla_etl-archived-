@@ -1,7 +1,10 @@
-__all__ = ["add_default_arguments", "add_default_services"]
+__all__ = [
+    "add_default_arguments", "add_default_services", "HeaderlessCsvWriter"
+]
 
 import os
 import fs
+import bonobo
 
 from sqlalchemy import create_engine
 from fs.sshfs import SSHFS
@@ -11,6 +14,26 @@ import datetime
 
 import requests
 from requests.auth import HTTPBasicAuth
+
+from bonobo.config import use_context
+
+
+@use_context
+class HeaderlessCsvWriter(bonobo.CsvWriter):
+    def write(self, file, context, *values, fs):
+        context.setdefault('lineno', 0)
+        fields = context.get_input_fields()
+
+        if not context.lineno:
+            context.writer = self.writer_factory(file)
+
+            if fields:
+                context.lineno += 1
+
+        return super(HeaderlessCsvWriter, self).write(
+            file, context, *values, fs=fs)
+
+    __call__ = write
 
 
 def valid_date(s):
