@@ -158,7 +158,8 @@ def get_bu_graph(**options):
         bonobo.UnpackItems(0),
         bonobo.PrettyPrinter(),
         bonobo.CsvWriter(
-            '/etl/centerstone/downloads/ProductLineLevel1.txt.bonobo',
+            '/etl/centerstone/downloads/ProductLineLevel1.txt' +
+            options['suffix'],
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"),
@@ -167,7 +168,7 @@ def get_bu_graph(**options):
         teamLevel3_remap,
         bonobo.UnpackItems(0),
         bonobo.CsvWriter(
-            '/etl/centerstone/downloads/TeamLevel3.txt.bonobo',
+            '/etl/centerstone/downloads/TeamLevel3.txt' + options['suffix'],
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"),
@@ -198,7 +199,8 @@ def get_costcenter_graph(**options):
         bonobo.UnpackItems(0),
         # Can't skip the header, but must
         bonobo.CsvWriter(
-            '/etl/centerstone/downloads/CostCenterLevel2.txt.bonobo',
+            '/etl/centerstone/downloads/CostCenterLevel2.txt' +
+            options['suffix'],
             lineterminator="\n",
             delimiter="\t",
             fs="sftp"),
@@ -219,20 +221,7 @@ def get_services(**options):
     :return: dict
     """
 
-    if options['use_cache']:
-        from requests_cache import CachedSession
-        workday = CachedSession('http.cache')
-    else:
-        workday = requests.Session()
-
-    workday.headers = {'User-Agent': 'Mozilla/ETL/v1'}
-    workday.auth = HTTPBasicAuth(options['wd_username'],
-                                 options['wd_password'])
-    workday.headers.update({'Accept-encoding': 'text/json'})
-
-    return {
-        'workday': workday,
-    }
+    return {}
 
 
 # The __main__ block actually execute the graph.
@@ -263,13 +252,9 @@ if __name__ == '__main__':
     parser = bonobo.get_argument_parser()
     add_default_arguments(parser)
 
-    parser.add_argument('--wd-username', type=str, default='ISU-WPR')
-    parser.add_argument(
-        '--wd-password', type=str, default=os.getenv('WD_PASSWORD'))
-
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
-        add_default_services(services, **options)
+        add_default_services(services, options)
 
         costcenter_g = get_costcenter_graph(**options)
         bu_g = get_bu_graph(**options)

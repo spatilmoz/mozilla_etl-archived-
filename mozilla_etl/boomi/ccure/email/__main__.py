@@ -218,7 +218,7 @@ if __name__ == '__main__':
 
     with bonobo.parse_args(parser) as options:
         services = get_services(**options)
-        add_default_services(services, **options)
+        add_default_services(services, options)
 
         g1 = get_cache_graph(**options)
         print("# Running card_id cache")
