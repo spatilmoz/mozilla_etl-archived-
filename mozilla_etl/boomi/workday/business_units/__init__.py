@@ -1,7 +1,3 @@
-def hello():
-    print("Hello World")
-
-
 import bonobo
 import bonobo_sqlalchemy
 import requests
@@ -76,7 +72,7 @@ def get_graph(**options):
     graph.add_chain(
         bonobo.UnpackItems(0),
         bonobo_sqlalchemy.InsertOrUpdate(
-            table_name='aws_accounts',
+            table_name='aws_accounts' + options['table_suffix'],
             discriminant=('account_id', ),
             engine='db'),
         _input=valid_aws_account,

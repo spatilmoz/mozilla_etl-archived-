@@ -237,7 +237,7 @@ def get_graph(**options):
         summarize_costs,
         bonobo.UnpackItems(0),
         bonobo_sqlalchemy.InsertOrUpdate(
-            table_name='fact_itsm_aws_historical_cost_bonobo',
+            table_name='fact_itsm_aws_historical_cost'  + options['table_suffix'],
             discriminant=(
                 'productname',
                 'date_sk',
@@ -275,7 +275,7 @@ def get_graph(**options):
 
     graph.add_chain(
         bonobo_sqlalchemy.InsertOrUpdate(
-            table_name=options['table'],
+            table_name=options['table']  + options['table_suffix'],
             discriminant=('invoiceid', 'linkedaccountid', 'payeraccountid',
                           'recordid'),
             engine='database'),
@@ -363,7 +363,7 @@ if __name__ == '__main__':
     parser.add_argument('--months', type=int, default=2)
     parser.add_argument('--limit', type=int, default=False)
     parser.add_argument(
-        '--table', type=str, default='ods_itsm_aws_monthly_cost_bonobo')
+        '--table', type=str, default='ods_itsm_aws_monthly_cost')
     parser.add_argument('--cleanup', dest='cleanup', action='store_true')
     parser.add_argument('--no-cleanup', dest='cleanup', action='store_false')
     parser.set_defaults(cleanup=True)

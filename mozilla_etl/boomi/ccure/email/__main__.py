@@ -86,7 +86,7 @@ def get_graph(**options):
     for engine in list(set(options['engine'])):
         graph.add_chain(
             bonobo_sqlalchemy.InsertOrUpdate(
-                table_name=options['table_name'],
+                table_name=options['table_name'] + options['table_suffix'],
                 discriminant=('badgeid', ),
                 buffer_size=10,
                 engine=engine),

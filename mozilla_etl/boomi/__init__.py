@@ -99,8 +99,10 @@ def add_default_services(services, options):
     # Set a file suffix for non-prod jobs
     if options['environment'] == "prod":
         options['suffix'] = ""
+        options['table_suffix'] = ""
     else:
         options['suffix'] = '.' + options['environment']
+        options['table_suffix'] = '_' + options['environment']
 
     return
 
