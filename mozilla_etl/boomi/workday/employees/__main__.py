@@ -76,7 +76,7 @@ def get_workday_employee_graph(**options):
             'workday-users.csv' + options['suffix'],
             lineterminator="\n",
             delimiter="\t",
-            fs="sftp"))
+            fs="brickftp"))
 
     graph.add_chain(
         split_active_employee,
@@ -85,7 +85,7 @@ def get_workday_employee_graph(**options):
             'Mozilla_Active_Users.txt' + options['suffix'],
             lineterminator="\n",
             delimiter="\t",
-            fs="sftp"),
+            fs="brickftp"),
         _input=workday_centerstone_employee_remap)
 
     graph.add_chain(
@@ -95,7 +95,7 @@ def get_workday_employee_graph(**options):
             'Mozilla_Termed_Users.txt' + options['suffix'],
             lineterminator="\n",
             delimiter="\t",
-            fs="sftp"),
+            fs="brickftp"),
         _input=workday_centerstone_employee_remap)
 
     return graph

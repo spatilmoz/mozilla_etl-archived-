@@ -58,7 +58,7 @@ def get_cache_graph(**options):
                     'valid_until', 'empty6', 'flag2', 'empty7', 'flag3',
                     'empty8', 'flag4'),
             delimiter='|',
-            fs='sftp'),
+            fs='brickftp'),
         badge_active,
         cache,
     )
@@ -79,7 +79,8 @@ def get_graph(**options):
     split_dbs = bonobo.noop
 
     graph.add_chain(
-        bonobo.CsvReader('/etl/metrics-insights/workday-users.csv', fs='sftp'),
+        bonobo.CsvReader(
+            '/etl/metrics-insights/workday-users.csv', fs='brickftp'),
         employee_active, find_badge_id, bonobo.UnpackItems(0), split_dbs)
 
     for engine in list(set(options['engine'])):

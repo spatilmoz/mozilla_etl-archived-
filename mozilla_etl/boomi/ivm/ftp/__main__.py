@@ -24,12 +24,12 @@ MAX_DESCRIPTION_LENGTH = 8
 def GetOrderXML(glob=[], prefix="/etl/ivm"):
     @use_context
     @use_no_input
-    @use('sftp')
-    def _GetOrderXML(context, sftp):
+    @use('brickftp')
+    def _GetOrderXML(context, brickftp):
 
-        for file in sftp.filterdir(prefix, files=glob):
+        for file in brickftp.filterdir(prefix, files=glob):
             if file.is_file:
-                with sftp.open(os.path.join(prefix, file.name)) as fp:
+                with brickftp.open(os.path.join(prefix, file.name)) as fp:
                     file = untangle.parse(fp)
 
                     for transaction in file.NewDataSet.transaction:

@@ -47,7 +47,7 @@ def get_graph(**options):
             delimiter='|',
             fields=('Admitted', 'blank1', 'Timestamp', 'blank2', 'Name',
                     'card_id', 'Location'),
-            fs='sftp'),
+            fs='brickftp'),
         timestamp,
         card_id,
         map_fields,

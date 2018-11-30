@@ -67,13 +67,14 @@ def add_default_services(services, options):
         echo=False)
 
     if options['local']:
-        services['sftp'] = fs.open_fs("file:///tmp/etl")
+        services['brickftp'] = fs.open_fs("file:///tmp/etl")
         services['centerstone'] = fs.open_fs("file:///tmp/etl")
     else:
-        services['sftp'] = fs.open_fs(
-            "ssh://%s@%s" % (options['sftp_username'], options['sftp_host']))
-        # Bug workaround to sftp-only server
-        services['sftp']._platform = "Linux"
+        services['brickftp'] = fs.open_fs(
+            "ssh://%s@%s" % (options['brickftp_username'],
+                             options['brickftp_host']))
+        # Bug workaround to brickftp's sftp-only server
+        services['brickftp']._platform = "Linux"
         services['centerstone'] = fs.open_fs(
             "ssh://MozillaBrickFTP@ftp.asset-fm.com:/Out/"),
 
@@ -147,14 +148,14 @@ def add_default_arguments(parser):
             'mozit-dw-dev.czbv3z9khmhv.us-west-2.redshift.amazonaws.com'))
 
     parser.add_argument(
-        '--sftp-host',
+        '--brickftp-host',
         type=str,
-        default=os.getenv('SFTP_HOST', 'mozilla.brickftp.com'))
+        default=os.getenv('BRICKFTP_HOST', 'mozilla.brickftp.com'))
 
     parser.add_argument(
-        '--sftp-username',
+        '--brickftp-username',
         type=str,
-        default=os.getenv('SFTP_USERNAME', 'moz-etl'))
+        default=os.getenv('BRICKFTP_USERNAME', 'moz-etl'))
 
     parser.add_argument(
         '--wd-username', type=str, default=os.getenv('WD_USERNAME', 'ISU-WPR'))

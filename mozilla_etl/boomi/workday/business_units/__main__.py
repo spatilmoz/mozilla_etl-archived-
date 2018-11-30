@@ -162,7 +162,7 @@ def get_bu_graph(**options):
             options['suffix'],
             lineterminator="\n",
             delimiter="\t",
-            fs="sftp"),
+            fs="brickftp"),
         _input=centerstone_BussUnit_remap)
     graph.add_chain(
         teamLevel3_remap,
@@ -171,7 +171,7 @@ def get_bu_graph(**options):
             '/etl/centerstone/downloads/TeamLevel3.txt' + options['suffix'],
             lineterminator="\n",
             delimiter="\t",
-            fs="sftp"),
+            fs="brickftp"),
         _input=centerstone_BussUnit_remap)
 
     return graph
@@ -203,7 +203,7 @@ def get_costcenter_graph(**options):
             options['suffix'],
             lineterminator="\n",
             delimiter="\t",
-            fs="sftp"),
+            fs="brickftp"),
         bonobo.count,
         _name="main")
 
