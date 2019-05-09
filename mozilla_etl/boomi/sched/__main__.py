@@ -23,10 +23,10 @@ from oauth2client import file, client, tools
 SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly'
 
 # The ID and range of a sample spreadsheet.
-SAMPLE_SPREADSHEET_ID = '1FWaNy_3PGSXOUSYnBpP2NLlWOhAogT8bIE3kU7iY1mw'
+SAMPLE_SPREADSHEET_ID = '1Xl0ELlLmiCh4V0uwWv-qe28kN0N0BwK9dUBq6xNLZx8'
 SAMPLE_RANGE_NAME = 'A4:X'
 
-SCHED_CONFERENCE = 'mozlandodecember2018'
+SCHED_CONFERENCE = 'whistlerallhandsjune2019'
 SCHED_API_KEY = os.getenv('SCHED_API_KEY')
 
 _cache = {}
